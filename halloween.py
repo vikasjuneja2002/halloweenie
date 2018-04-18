@@ -54,7 +54,52 @@ class Home(Observer):
     nummons = len(monsters)
 
   def spookYou(self):
+    numZombs = 0
+    numVamps = 0
+    numGhuls = 0
+    numWolfs = 0
+    numPeopl = 0
+    msgtoprint = "Monsters!\n"
     for i in self.monsters:
+      if (i.__class__.__name__ == "Zombie"):
+        numZombs = numZombs + 1
+      if (i.__class__.__name__ == "Vampire"):
+        numVamps = numVamps + 1
+      if (i.__class__.__name__ == "Ghoul"):
+        numGhuls = numGhuls + 1
+      if (i.__class__.__name__ == "Werewolf"):
+        numWolfs = numWolfs + 1
+      if (i.__class__.__name__ == "Person"):
+        numWolfs = numPeopl + 1
+
+    if (numZombs + numGhuls + numWolfs + numVamps < 1):
+      msgtoprint = ""
+    elif (numZombs > 0):
+      msgtoprint = msgtoprint + str(numZombs) + "x Zombie\n"
+    elif (numVamps > 0):
+      msgtoprint = msgtoprint + str(numVamps) + "x Vampire\n"
+    elif (numWolfs > 0):
+      msgtoprint = msgtoprint + str(numWolfs) + "x Werewolf\n"
+    elif (numGhuls > 0):
+      msgtoprint = msgtoprint + str(numGhuls) + "x Ghouls\n"
+
+    if (numPeopl > 0):
+      msgtoprint = msgtoprint + "\nThere "
+
+      # My kingdom for a ternary conditional
+      # You can have it all, my empire of dirt
+      if (numPeopl > 1):
+        msgtoprint = msgtoprint + "are "
+      if (numPeopl == 1):
+        msgtoprint = msgtoprint + "is "
+      msgtoprint = msgtoprint + str(numPeopl) + " healthy human"
+      if (numPeopl > 1):
+        msgtoprint = msgtoprint + "s"
+
+      msgtoprint = msgtoprint + " in the house with you."
+
+    print(msgtoprint)
+
 
 class Game:
   def __init__(self):
@@ -191,6 +236,7 @@ class You:
       self.xloc = self.xloc - 1
 
     self.look()
+    game.neighborhood[self.xloc][self.yloc].spookYou()
     return True
 
 # Singleton, so no other "yous" out there
@@ -435,7 +481,11 @@ class interpreter():
     if (text == 'north' or
         text == 'south' or
         text == 'east'  or 
-        text == 'west'):
+        text == 'west'  or
+        text == 'n'     or
+        text == 's'     or
+        text == 'e'     or
+        text == 'w'):
       you.move(text)
 
     if (text[0:3] == 'go '):
