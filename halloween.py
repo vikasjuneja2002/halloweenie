@@ -74,13 +74,13 @@ class Home(Observer):
 
     if (numZombs + numGhuls + numWolfs + numVamps < 1):
       msgtoprint = ""
-    elif (numZombs > 0):
+    if (numZombs > 0):
       msgtoprint = msgtoprint + str(numZombs) + "x Zombie\n"
-    elif (numVamps > 0):
+    if (numVamps > 0):
       msgtoprint = msgtoprint + str(numVamps) + "x Vampire\n"
-    elif (numWolfs > 0):
+    if (numWolfs > 0):
       msgtoprint = msgtoprint + str(numWolfs) + "x Werewolf\n"
-    elif (numGhuls > 0):
+    if (numGhuls > 0):
       msgtoprint = msgtoprint + str(numGhuls) + "x Ghouls\n"
 
     if (numPeopl > 0):
@@ -405,7 +405,7 @@ class Messages():
   # Sends the message indicating that a monster has been defeated.
   def defeatMsg(defeated):
     print(self.name(defeated) + ' returns to human form.')
-  
+
   def gameOverMsg(self, killed_by):
     msgtoprint = 'Goodbye.'
     if (killed_by.__class__.__name__ == 'Zombie'):
@@ -499,6 +499,41 @@ class interpreter():
 
     if (text == 'loc'):
       print(str(you.xloc) + ", " + str(you.yloc))
+
+    if (text[0:4] == 'use '):
+      arg = text[4:]
+      if (arg == "hersheykiss" or arg == "hershey" or arg == "kiss" or arg == "hk"):
+        use = HersheyKiss
+      elif (arg == "chocolatebar" or arg == "chocolate" or arg == "choco" or arg == "bar" or arg == "cb"):
+        use = ChocolateBar
+      elif (arg == "sourstraw" or arg == "sourstraws" or arg == "sour" or arg == "straw" or arg == "straws" or arg == "ss"):
+        use = SourStraws
+      elif (arg == "nerdbombs" or arg == "nerds" or arg == "bombs" or arg == "nerdbomb" or arg == "nerd" or arg == "bomb" or arg == "nb"):
+        use = NerdBombs
+      else:
+        print("I've never heard of such an item...")
+
+      foundItem = False
+      print("use: " + str(use)) # delet this
+
+      for item in you.inventory:
+        print(str(item.itemType.__class__)) # delet this
+        if item.itemType.__class__ is use.__class__:
+          print(str(item.itemType.__class__) + " found") # delet this
+          foundItem = True
+          if item.use():
+            for mon in game.neighborhood[you.xloc][you.yloc]:
+              if mon is not Person:
+                you.useItem(item, mon)
+      
+      if (not foundItem):
+        print("You don't have any of that item!")
+
+
+#class HersheyKiss(Weapon)
+#class SourStraws(Weapon)
+#class ChocolateBar(Weapon)
+#class NerdBombs(Weapon)
 
 game.populateHomes()
 you.look()
