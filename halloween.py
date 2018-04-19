@@ -5,6 +5,11 @@ import sys
 import math
 from abc import ABCMeta, abstractmethod
 
+def d(dice, faces):
+  if (dice <= 0 or faces <= 0):
+    return 0
+  return int(random.uniform(dice,faces)) + d((dice - 1), faces) + 1
+
 
 # Shamelessly stolen right off your gitpitch presentation
 class Observer(object):
@@ -39,27 +44,32 @@ neighborhoodMap = {(0, 0) : "S",  (1, 0) : "ES",  (2, 0) : "WS",   (3, 0) : "ES"
                    (0, 3) : "EN", (1, 3) : "WES", (2, 3) : "WEN",  (3, 3) : "WS",  (4, 3) : "SN", 
                    (0, 4) : "E",  (1, 4) : "WEN", (2, 4) : "WE",   (3, 4) : "WEN", (4, 4) : "WN"}
                    
-class Home(Observer):
+class Home(Observer, Observable):
   def __init__(self):
-    nummons = random.randint(0, 10)
-    game.numMonst = game.numMonst + nummons
-    game.origNumMonst = game.numMonst
-
+    super().__init__()
+    self.add_observer(game)
+    self.nummons = random.randint(0, 10)
     self.monsters = []
 
-    for i in range(0, nummons):
-      self.monsters.append(random.choice([Vampire(), Ghoul(), Zombie(), Werewolf()]))
+    for i in range(0, self.nummons):
+      self.monsters.append(random.choice([Vampire(self), Ghoul(self), Zombie(self), Werewolf(self)]))
 
   def update(self):
-    nummons = len(monsters)
+    self.nummons = 0
+    for i in self.monsters:
+      if type(i) is not Person:
+        self.nummons = self.nummons + 1
+    for i in self.observers:
+      i.update()
 
-  def spookYou(self):
+  def spookYou(self, attack):
+    msgtoprint = ""
+
     numZombs = 0
     numVamps = 0
     numGhuls = 0
     numWolfs = 0
     numPeopl = 0
-    msgtoprint = "Monsters!\n"
     for i in self.monsters:
       if (i.__class__.__name__ == "Zombie"):
         numZombs = numZombs + 1
@@ -70,10 +80,10 @@ class Home(Observer):
       if (i.__class__.__name__ == "Werewolf"):
         numWolfs = numWolfs + 1
       if (i.__class__.__name__ == "Person"):
-        numWolfs = numPeopl + 1
+        numPeopl = numPeopl + 1
 
-    if (numZombs + numGhuls + numWolfs + numVamps < 1):
-      msgtoprint = ""
+    if (numZombs + numGhuls + numWolfs + numVamps > 1):
+      msgtoprint = "Monsters!\n"
     if (numZombs > 0):
       msgtoprint = msgtoprint + str(numZombs) + "x Zombie\n"
     if (numVamps > 0):
@@ -81,7 +91,7 @@ class Home(Observer):
     if (numWolfs > 0):
       msgtoprint = msgtoprint + str(numWolfs) + "x Werewolf\n"
     if (numGhuls > 0):
-      msgtoprint = msgtoprint + str(numGhuls) + "x Ghouls\n"
+      msgtoprint = msgtoprint + str(numGhuls) + "x Ghoul\n"
 
     if (numPeopl > 0):
       msgtoprint = msgtoprint + "\nThere "
@@ -100,18 +110,27 @@ class Home(Observer):
 
     print(msgtoprint)
 
+    if (attack):
+      for mon in self.monsters:
+        mon.attackYou()
 
-class Game:
+
+
+class Game(Observer):
   def __init__(self):
     self.numMonst = 0
-    self.origNumMonst = self.numMonst
-    self.neighborhood = [[xsize] * ysize for x in range(5)];
+    super().__init__()
 
+  def update(self):
+    self.numMonst = 0
+    for i in range(5):
+      for j in range(5):
+        self.numMonst = self.numMonst + self.neighborhood[i][j].nummons
   
   def populateHomes(self):
-    for i in range(0, xsize):
-      for j in range(0, ysize):
-        self.neighborhood[i][j] = Home()
+    self.neighborhood = [[Home() for i in range (0, 5)] for j in range(0, 5)] 
+    self.update()
+    self.origNumMonst = self.numMonst
 
   def gameOver(self, killed_by):
     messenger.gameOverMsg(killed_by)
@@ -138,6 +157,7 @@ class itemStack():
     if (self.itemType.uses == 0):
       self.num = self.num - 1
       self.itemType.uses = self.itemType.maxUses
+    return True
 
   def get(self, num):
     self.num = self.num + num
@@ -161,6 +181,7 @@ class HersheyKiss(Weapon):
 
 class SourStraws(Weapon):
   def __init__(self):
+    super().__init__()
     self.uses = 2
     self.maxUses = 2
     self.mindammod = 1.0
@@ -168,6 +189,7 @@ class SourStraws(Weapon):
 
 class ChocolateBar(Weapon):
   def __init__(self):
+    super().__init__()
     self.uses = 4
     self.maxUses = 4
     self.mindammod = 2.0
@@ -176,6 +198,7 @@ class ChocolateBar(Weapon):
 
 class NerdBombs(Weapon):
   def __init__(self):
+    super().__init__()
     self.uses = 1
     self.maxUses = 1
     self.mindammod = 3.5
@@ -185,29 +208,44 @@ class NerdBombs(Weapon):
 
 class You:
   def __init__(self):
+    super().__init__()
+    self.mindammod = 10
+    self.maxdammod = 20
     self.hp = 100 + int(random.uniform(0, 27))
+    self.maxhp = self.hp
     self.damageTable = {}
-    self.inventory = [itemStack(HersheyKiss(), 1),
-                      itemStack(SourStraws(), 0),
-                      itemStack(ChocolateBar(), 0),
-                      itemStack(NerdBombs(), 0)]
+    self.inventory = [itemStack(HersheyKiss(), d(1, 10)),
+                      itemStack(SourStraws(), d(3, 6)),
+                      itemStack(ChocolateBar(), d(3, 6)),
+                      itemStack(NerdBombs(), d(3, 6))]
     self.xloc = 0
     self.yloc = 0
 
-  def takeDamage(self, attacker, mindam, maxdam):
-    damage = int(random.uniform(mindam, maxdam))
+  def takeDamage(self, attacker):
+    damage = int(random.uniform(attacker.minatk, attacker.maxatk))
     self.hp = self.hp - damage
     messenger.damageYouMsg(attacker, damage)
+    if (self.hp > self.maxhp):
+      self.hp = self.maxhp
     if (self.hp <= 0):
-      game.gameOver()
+      game.gameOver(attacker)
+  
+  def calcDammod(self):
+    return 1 + random.uniform(self.mindammod, self.maxdammod)
 
   def useItem(self, item, target):
     if(item.use()):
-      print("You use the " + item.__class__.__name__ + " on " + messenger.name(target) + ".")
-      target.takeDamage(item)
+      if (type(item.itemType) == NerdBombs):
+        print("You use the " + item.itemType.__class__.__name__ + " on the monsters!")
+        for mon in game.neighborhood[self.xloc][self.yloc].monsters:
+          mon.takeDamage(item.itemType)
+      else:
+        print("You use the " + item.itemType.__class__.__name__ + " on " + messenger.name(target) + ".")
+        target.takeDamage(item.itemType)
 
   def look(self):
     messenger.exitsMsg(self.xloc, self.yloc)
+    game.neighborhood[self.xloc][self.yloc].spookYou(False)
 
   def move(self, direction):
     direction = direction.upper()
@@ -235,8 +273,8 @@ class You:
     elif (direction == "W"):
       self.xloc = self.xloc - 1
 
-    self.look()
-    game.neighborhood[self.xloc][self.yloc].spookYou()
+    messenger.exitsMsg(self.xloc, self.yloc)
+    game.neighborhood[self.xloc][self.yloc].spookYou(True)
     return True
 
 # Singleton, so no other "yous" out there
@@ -245,38 +283,41 @@ you = You()
 
 class NPC(Observable):
   def __init__(self):
+    super().__init__()
     self.mindammod = 1
     self.maxdammod = 1
     self.hp = 1
     self.damageTable = {}
 
   # References the damage table and sees what the damage modifier for a given
-  # weapon is, and
+  # weapon is, and returns it.
   def calcDammod(self, wep):
-    damage = self.damageTable.get(wep.__class__.__name__, 1)
+    return self.damageTable.get(wep.__class__.__name__, 1)
 
   # Deducts hit points from the monster's total, and prints a relevant message.
   def takeDamage(self, wep):
-    damage = int(self.calcDammod(wep) * wep.calcDammod())
+    damage = int(self.calcDammod(wep) * wep.calcDammod() * you.calcDammod())
     self.hp = self.hp - damage
-    message.damageMessage(you, wep, self, damage)
+    messenger.damageMsg(you, wep, self, damage)
     if (self.hp <= 0):
-        self.beDefeated()
+      self.beDefeated()
 
-  def attackPlayer():
-    you.takeDamage(self.mindammod, self.maxdammod)
+  def attackYou(self):
+    you.takeDamage(self)
 
   def beDefeated(self):
     messenger.defeatMsg(self)
  
-    for i in observers:
-      i.monsters.remove(self)
+    for i in self.observers:
       i.monsters.append(Person())
+      i.monsters.remove(self)
       i.update()
+      self.remove_observer(i)
 
 
 class Person(NPC):
   def __init__(self):
+    super().__init__()
     self.minatk = -1;
     self.maxatk = -1;
     self.hp = 100
@@ -289,22 +330,27 @@ class Person(NPC):
 
 
 class Zombie(NPC):
-  def __init__(self):
+  def __init__(self, observer):
+    super().__init__()
     self.minatk = 0
     self.maxatk = 10
     self.hp = random.randint(50, 100)
     self.damageTable = { 'SourStraws': 2 }
+    self.add_observer(observer)
 
 
 class Vampire(NPC):
-  def __init__(self):
+  def __init__(self, observer):
+    super().__init__()
     self.minatk = 10
     self.maxatk = 20
     self.hp = random.randint(100, 200)
     self.damageTable = { 'ChocolateBar': 0 }
+    self.add_observer(observer)
 
 class Werewolf(NPC):
-  def __init__(self):
+  def __init__(self,observer):
+    super().__init__()
     self.minatk = 0
     self.maxatk = 40
     self.hp = 200
@@ -312,13 +358,16 @@ class Werewolf(NPC):
       'ChocolateBar': 0,
       'SourStraws': 0
     }
+    self.add_observer(observer)
 
 class Ghoul(NPC):
-  def __init__(self):
+  def __init__(self,observer):
+    super().__init__()
     self.minatk = 15
     self.maxatk = 30
     self.hp = random.randint(40, 80)
-    self.damagetable = {'NerdBombs': 5}
+    self.damageTable = {'NerdBombs': 5}
+    self.add_observer(observer)
 
 
 
@@ -356,17 +405,17 @@ class Messages():
 
 
   # Sends a message based on damage dealt to a monster
-  def damageMsg(attacker, weapon, target, damage):
-    msgtoprint = 'Can\'t happen'
+  def damageMsg(self, attacker, weapon, target, damage):
+    msgtoprint = ''
 
     if (damage == 0):
       msgtoprint = self.x_is(target).capitalize() + ' unharmed by '
-      msgtoprint = msgtoprint + self.genit(attacker)
+      msgtoprint = msgtoprint + self.genit(attacker) + ' '
       msgtoprint = msgtoprint + weapon.__class__.__name__ + '!'
 
     elif (target.calcDammod(weapon) > 1 ):
       msgtoprint = self.name(target).capitalize() + ' '
-      msgtoprint = msgtoprint + 'winces!'
+      msgtoprint = msgtoprint + 'winces! '
 
     if (damage < 0):
       msgtoprint = self.x_is(attacker).capitalize() + ' healing '
@@ -375,13 +424,13 @@ class Messages():
       msgtoprint = msgtoprint + ' healed for ' + (-1 * damage) + '.'
 
     elif (damage > 0):
-      msgtoprint = msgtoprint + self.name(attacker).capitalize() + ' takes '
-      msgtoprint = msgtoprint + damage + ' points of damage!'
+      msgtoprint = msgtoprint + self.name(target).capitalize() + ' takes '
+      msgtoprint = msgtoprint + str(damage) + ' points of damage!'
 
     print(msgtoprint)
 
   # Sends a message based on damage dealt to you
-  def damageYouMsg(attacker, damage):
+  def damageYouMsg(self, attacker, damage):
     msgtoprint = 'Can\'t happen'
     target = you
 
@@ -393,27 +442,35 @@ class Messages():
       msgtoprint = self.x_is(attacker).capitalize() + ' healing '
       msgtoprint = msgtoprint + self.genit(target) + ' wounds. '
       msgtoprint = msgtoprint + self.x_is(target).capitalize()
-      msgtoprint = msgtoprint + ' healed for ' + (-1 * damage) + '.'
+      msgtoprint = msgtoprint + ' healed for ' + (-1 * damage) + ' point'
+      if (damage < -1):
+        msgtoprint = msgtoprint + 's'
+      msgtoprint = msgtoprint + ' of damage.'
 
     elif (damage > 0):
+      msgtoprint = self.name(attacker).capitalize() + ' attacks you! '
       msgtoprint = msgtoprint + self.name(target).capitalize() + ' take '
-      msgtoprint = msgtoprint + damage + ' points of damage!'
+      msgtoprint = msgtoprint + str(damage) + ' point'
+      if (damage > 1):
+        msgtoprint = msgtoprint + 's'
+      msgtoprint = msgtoprint + ' of damage!'
 
     print(msgtoprint)
 
 
   # Sends the message indicating that a monster has been defeated.
-  def defeatMsg(defeated):
+  def defeatMsg(self, defeated):
     print(self.name(defeated) + ' returns to human form.')
 
   def gameOverMsg(self, killed_by):
+    print()
     msgtoprint = 'Goodbye.'
     if (killed_by.__class__.__name__ == 'Zombie'):
       msgtoprint = 'Your lifeless body falls to the ground before slowly rising from the dead with a moan...'
     if (killed_by.__class__.__name__ == 'Vampire'):
       msgtoprint = 'Drained of blood, you feel your consciousness fading...\n'
       msgtoprint = msgtoprint + 'You come to in a coffin, '
-      msgtoprint = msgtorpint + 'feeling strangely thirsty.'
+      msgtoprint = msgtoprint + 'feeling strangely thirsty.'
     if (killed_by.__class__.__name__ == 'Ghoul'):
       msgtoprint = 'You are paralyzed in fear, and you feel your blood run '
       msgtoprint = msgtoprint + 'cold... You lie motionless for hours before the feeling finally returns to your limbs.\n'
@@ -425,7 +482,7 @@ class Messages():
       msgtoprint = msgtoprint + 'mind.'
 
     print(msgtoprint)
-    print('= = = G A M E  O V E R = = =')
+    print('\n= = = G A M E  O V E R = = =')
     msgtoprint = 'You defeated ' + str(game.origNumMonst - game.numMonst) + ' out of '
     msgtoprint = msgtoprint + str(game.origNumMonst) + ' monsters before '
     if (not (killed_by is None)):
@@ -452,13 +509,13 @@ class Messages():
     
     print(msgtoprint)
 
-  def inventory():
+  def inventory(self):
     msgtoprint = "You carry the following items:\n"
-    for i in self.inventory:
+    for i in you.inventory:
       if (i.num > 0):
-        msgtoprint = msgtoprint + i.num + "x" + self.name(i.itemType)
+        msgtoprint = msgtoprint + str(i.num) + "x " + i.itemType.__class__.__name__
         if (i.itemType.uses > 0):
-          msgtoprint = msgtoprint + " (" + i.itemType.uses + " uses)"
+          msgtoprint = msgtoprint + " (" + str(i.itemType.uses) + " uses)"
         msgtoprint = msgtoprint + "\n"
 
     print(msgtoprint)
@@ -494,11 +551,17 @@ class interpreter():
     if (text[0:6] == 'move '):
       you.move(text[6:])
     
-    if (text == 'look'):
+    if (text == 'look' or text == 'l'):
       you.look()
 
     if (text == 'loc'):
       print(str(you.xloc) + ", " + str(you.yloc))
+    
+    if (text == 'inventory'):
+      messenger.inventory()
+    
+    if (text == 'hp'):
+      print("Current hit point total: " + str(you.hp) + "/" + str(you.maxhp))
 
     if (text[0:4] == 'use '):
       arg = text[4:]
@@ -512,31 +575,24 @@ class interpreter():
         use = NerdBombs
       else:
         print("I've never heard of such an item...")
+        return False
 
       foundItem = False
-      print("use: " + str(use)) # delet this
 
       for item in you.inventory:
-        print(str(item.itemType.__class__)) # delet this
-        if item.itemType.__class__ is use.__class__:
-          print(str(item.itemType.__class__) + " found") # delet this
+        if item.itemType.__class__ is use:
           foundItem = True
-          if item.use():
-            for mon in game.neighborhood[you.xloc][you.yloc]:
-              if mon is not Person:
-                you.useItem(item, mon)
-      
+          for mon in game.neighborhood[you.xloc][you.yloc].monsters:
+            if type(mon) is not Person:
+              you.useItem(item, mon)
+              break
+
       if (not foundItem):
         print("You don't have any of that item!")
 
 
-#class HersheyKiss(Weapon)
-#class SourStraws(Weapon)
-#class ChocolateBar(Weapon)
-#class NerdBombs(Weapon)
-
 game.populateHomes()
 you.look()
 while(True):
-  text = input(">")
+  text = input("> ")
   interpreter.read(text)
